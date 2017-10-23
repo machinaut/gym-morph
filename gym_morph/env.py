@@ -1,52 +1,68 @@
 #!/usr/bin/env python
-import os
 import numpy as np
 import glfw
 from gym import Env
-from mujoco_py import load_model_from_path, MjSim, MjViewer
+from gym.spaces import Box
+from mujoco_py import MjSim, MjViewer, const
 
-
-# Based on the MuJoCo Ant model
-SPECIES = ['longleg',  # morphing - extends first leg joint
-           'longfoot',  # morphing - extends second leg joint
-           'insect',  # non-morphing - 6 two-joint legs
-           'lifter',  # non-morphing - extra lifing joint in hip
-           'triple',  # non-morphing - three leg joints
-           'ant']  # non-morphing - 4 two-joint legs
-
-TASK = ['run',  # Run as fast as possible in a single direction
-        'flagrun',  # Run to a specified 2d location
-        'twister']  # Place foot on a specified spot
+from gym_morph import SPECIES, TASK
+from gym_morph.model import build_robot
 
 
 class MorphEnv(Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, species='ant', task='run'):
-        assert species in SPECIES, 'Invalid species'
+        assert species in SPECIES, 'Invalid species "{}"'.format(species)
+        assert task in TASK, 'Invalid task "{}"'.format(task)
         self.species = species
         self.task = task
         self.current_seed = 0  # Used to generate random initial states
-        # TODO: modify based on species and task
-        curdir = os.path.dirname(__file__)
-        self.sim = MjSim(load_model_from_path(os.path.join(curdir, 'ant.xml')))
+        self.sim = MjSim(build_robot(species))
+        ctrlrange = self.sim.model.actuator_ctrlrange
+        self.action_space = Box(ctrlrange[:, 0], ctrlrange[:, 1])
         self.viewer = None
 
     def _reset(self):
-        # Use seed to generate random state
-        # Use random state to generate:
-        #   init pos, init rotation, init joint position, task goal locations
         self.current_seed += 1
-        # random_state = np.random.RandomState(self.current_seed)
+        rs = np.random.RandomState(self.current_seed)
+
+        for i, q in enumerate(self.sim.model.jnt_qposadr):
+            if self.sim.model.jnt_type[i] != const.JNT_FREE:
+                jnt_range = self.sim.model.jnt_range[i]
+                self.sim.data.qpos[q] = rs.uniform(jnt_range[0], jnt_range[1])
+            else:  # Free joint, only set angle, not position
+                quat = rs.uniform(0, 1, size=4)  # Random quaternion
+                quat /= np.sqrt(np.sum(np.square(quat)))  # Normalize
+                self.sim.data.qpos[q + 3:q + 7] = quat
+
+        # TODO: Use seed to generate random goal
+        self.last_torso_xpos = self.sim.data.get_body_xpos('torso').copy()
         return self._get_obs()
 
     def _get_obs(self):
         # TODO: input goal locations relative to body pose
         return np.concatenate([self.sim.data.qpos, self.sim.data.qvel])
 
-    def _step(self):
+    def _get_reward(self):
+        if self.task == 'run':
+            # Reward is velocity in the x direction
+            xpos = self.sim.data.get_body_xpos('torso')
+            reward = xpos[0] - self.last_torso_xpos[0]
+            self.last_torso_xpos = xpos.copy()
+            return reward
+        return 0.
+
+    def _set_action(self, action):
+        action = np.asarray(action)
+        assert self.action_space.contains(action), '{}'.format(action)
+        self.sim.data.ctrl[:] = action
+
+    def _step(self, action):
+        self._set_action(action)
+        self.sim.step()
         obs = self._get_obs()
-        reward = 0  # TODO
+        reward = self._get_reward()
         done = False  # TODO
         info = {}  # TODO
         return obs, reward, done, info
