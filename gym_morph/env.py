@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os
 import numpy as np
+import glfw
 from gym import Env
 from mujoco_py import load_model_from_path, MjSim, MjViewer
 
@@ -52,10 +53,12 @@ class MorphEnv(Env):
 
     def _render(self, mode='human', close=False):
         assert mode == 'human'  # TODO: rgb_array rendering
-        assert not close  # TODO: handle closing viewer
-        if self.viewer is None:
-            self.viewer = MjViewer(self.sim)
-        self.viewer.render()
+        if close and self.viewer is not None:
+            glfw.destroy_window(self.viewer.window)
+        else:
+            if self.viewer is None:
+                self.viewer = MjViewer(self.sim)
+            self.viewer.render()
 
     def _seed(self, seed=None):
         if seed is not None:
