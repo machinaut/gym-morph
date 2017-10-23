@@ -21,6 +21,8 @@ class MorphEnv(Env):
         self.sim = MjSim(build_robot(species))
         ctrlrange = self.sim.model.actuator_ctrlrange
         self.action_space = Box(ctrlrange[:, 0], ctrlrange[:, 1])
+        obs_size = self.sim.model.nq + self.sim.model.nv
+        self.observation_space = Box(-np.inf, np.inf, obs_size)
         self.viewer = None
 
     def _reset(self):
@@ -71,7 +73,7 @@ class MorphEnv(Env):
         assert mode == 'human'  # TODO: rgb_array rendering
         if close and self.viewer is not None:
             glfw.destroy_window(self.viewer.window)
-        else:
+        elif not close:
             if self.viewer is None:
                 self.viewer = MjViewer(self.sim)
             self.viewer.render()
