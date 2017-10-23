@@ -4,7 +4,7 @@ from setuptools import find_packages, setup
 
 
 setup(name='gym-morph',
-      version='0.0.2',
+      version='0.0.3',
       description='Gym mujoco environments with morphology-control',
       packages=find_packages(),
       author='Alex Ray',

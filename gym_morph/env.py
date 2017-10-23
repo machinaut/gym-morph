@@ -78,5 +78,5 @@ class MorphEnv(Env):
 
     def _seed(self, seed=None):
         if seed is not None:
-            self.seed = seed
-        return [self.seed]
+            self.current_seed = seed
+        return [self.current_seed]
