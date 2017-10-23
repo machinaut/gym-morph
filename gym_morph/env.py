@@ -1,5 +1,9 @@
 #!/usr/bin/env python
+import os
+import numpy as np
 from gym import Env
+from mujoco_py import load_model_from_path, MjSim, MjViewer
+
 
 # Based on the MuJoCo Ant model
 SPECIES = ['longleg',  # morphing - extends first leg joint
@@ -15,23 +19,43 @@ TASK = ['run',  # Run as fast as possible in a single direction
 
 
 class MorphEnv(Env):
+    metadata = {'render.modes': ['human']}
+
     def __init__(self, species='ant', task='run'):
         assert species in SPECIES, 'Invalid species'
         self.species = species
         self.task = task
-        self.seed = 0  # Used to generate random initial states
+        self.current_seed = 0  # Used to generate random initial states
+        # TODO: modify based on species and task
+        curdir = os.path.dirname(__file__)
+        self.sim = MjSim(load_model_from_path(os.path.join(curdir, 'ant.xml')))
+        self.viewer = None
 
     def _reset(self):
         # Use seed to generate random state
         # Use random state to generate:
         #   init pos, init rotation, init joint position, task goal locations
-        pass
+        self.current_seed += 1
+        # random_state = np.random.RandomState(self.current_seed)
+        return self._get_obs()
+
+    def _get_obs(self):
+        # TODO: input goal locations relative to body pose
+        return np.concatenate([self.sim.data.qpos, self.sim.data.qvel])
 
     def _step(self):
-        pass
+        obs = self._get_obs()
+        reward = 0  # TODO
+        done = False  # TODO
+        info = {}  # TODO
+        return obs, reward, done, info
 
-    def _render(self):
-        pass
+    def _render(self, mode='human', close=False):
+        assert mode == 'human'  # TODO: rgb_array rendering
+        assert not close  # TODO: handle closing viewer
+        if self.viewer is None:
+            self.viewer = MjViewer(self.sim)
+        self.viewer.render()
 
     def _seed(self, seed=None):
         if seed is not None:

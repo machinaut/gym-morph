@@ -1,4 +1,5 @@
-from gym.envs.registration import register, SPECIES, TASK
+from gym.envs.registration import register
+from .env import SPECIES, TASK
 
 for species in SPECIES:
     for task in TASK:
